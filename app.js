@@ -664,16 +664,18 @@ async function downloadImage() {
   const fileName = `choae_camera_${ts}.jpg`;
 
   // 모바일: Web Share API로 네이티브 공유 시트 → "사진에 저장" 가능
-  if (navigator.canShare) {
+  if (navigator.share) {
     try {
       const file = new File([lastCapturedBlob], fileName, { type: 'image/jpeg' });
-      if (navigator.canShare({ files: [file] })) {
-        await navigator.share({ files: [file] });
+      const shareData = { files: [file] };
+      if (!navigator.canShare || navigator.canShare(shareData)) {
+        await navigator.share(shareData);
         return;
       }
     } catch (e) {
-      // 사용자가 공유 취소한 경우 무시
+      // 사용자가 공유 취소하거나 파일 공유 미지원 시 폴백
       if (e.name === 'AbortError') return;
+      console.warn('Share API 실패, 다운로드로 전환:', e);
     }
   }
 
