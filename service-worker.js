@@ -2,7 +2,7 @@
  * 첫 방문 시 정적 리소스를 캐시 → 이후 오프라인에서도 동작
  */
 
-const CACHE_NAME = 'choae-camera-v6';
+const CACHE_NAME = 'choae-camera-v7';
 const ASSETS = [
   './',
   './index.html',
@@ -13,11 +13,6 @@ const ASSETS = [
   './icon-192.png',
   './icon-512.png',
   './icon-maskable-512.png',
-  './characters/Gemini_Generated_Image_50ez6t50ez6t50ez.png',
-  './characters/Gemini_Generated_Image_9oheph9oheph9ohe.png',
-  './characters/Gemini_Generated_Image_cfnus1cfnus1cfnu.png',
-  './characters/Gemini_Generated_Image_naaz53naaz53naaz.png',
-  './characters/Gemini_Generated_Image_pj4z23pj4z23pj4z.png',
 ];
 
 // 설치: 정적 자산 캐시

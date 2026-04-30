@@ -26,13 +26,10 @@ ar_camera/
 ├── icon-192.png                # PWA 아이콘
 ├── icon-512.png
 ├── icon-maskable-512.png
-├── README.md
-└── characters/                 # 캐릭터 PNG (교체 가능)
-    ├── character_01.png
-    ├── character_02.png
-    ├── character_03.png
-    └── character_04.png
+└── README.md
 ```
+
+> 캐릭터 이미지는 저작권 보호를 위해 저장소에 포함되지 않습니다. 앱 내 "+" 버튼으로 직접 추가해 주세요.
 
 ## 📱 컴퓨터 없이 폰에서만 쓰기 (권장)
 

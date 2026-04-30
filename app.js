@@ -9,13 +9,7 @@
  * ============================================================ */
 
 // ===== 기본 placeholder 캐릭터 (앱에 함께 배포되는 일반 도형) =====
-const DEFAULT_CHARACTERS = [
-  { id: 'default_1', src: 'characters/Gemini_Generated_Image_50ez6t50ez6t50ez.png', name: '슬롯 1', custom: false },
-  { id: 'default_2', src: 'characters/Gemini_Generated_Image_9oheph9oheph9ohe.png', name: '슬롯 2', custom: false },
-  { id: 'default_3', src: 'characters/Gemini_Generated_Image_cfnus1cfnus1cfnu.png', name: '슬롯 3', custom: false },
-  { id: 'default_4', src: 'characters/Gemini_Generated_Image_naaz53naaz53naaz.png', name: '슬롯 4', custom: false },
-  { id: 'default_5', src: 'characters/Gemini_Generated_Image_pj4z23pj4z23pj4z.png', name: '슬롯 5', custom: false },
-];
+const DEFAULT_CHARACTERS = [];
 
 // localStorage 키
 const STORAGE_KEY = 'choae_custom_characters_v1';
