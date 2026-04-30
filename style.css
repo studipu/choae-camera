@@ -141,9 +141,7 @@ html, body {
 }
 
 .char-wrapper.selected {
-  outline: 2px solid rgba(255, 255, 255, 0.7);
-  outline-offset: 4px;
-  border-radius: 4px;
+  /* 선택 상태는 내부적으로만 추적, 시각적 표시 없음 */
 }
 
 .char-remove {
