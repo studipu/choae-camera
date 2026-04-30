@@ -391,6 +391,20 @@ function setupCropGestures() {
   document.addEventListener('pointercancel', onEnd);
 }
 
+// ===== 삭제 확인 모달 (비동기, 카메라 멈춤 방지) =====
+const deleteConfirmModal = $('#delete-confirm-modal');
+let pendingDeleteCharId = null;
+
+function showDeleteConfirm(charId) {
+  pendingDeleteCharId = charId;
+  deleteConfirmModal.classList.remove('hidden');
+}
+
+function hideDeleteConfirm() {
+  deleteConfirmModal.classList.add('hidden');
+  pendingDeleteCharId = null;
+}
+
 // ===== 캐릭터 삭제 (localStorage에서) =====
 function deleteCustomCharacter(id) {
   const customs = loadCustomCharacters();
@@ -447,9 +461,7 @@ function buildGallery() {
       del.textContent = '×';
       del.addEventListener('click', (e) => {
         e.stopPropagation();
-        if (confirm('이 캐릭터를 삭제할까요?')) {
-          deleteCustomCharacter(c.id);
-        }
+        showDeleteConfirm(c.id);
       });
       thumb.appendChild(del);
     }
@@ -633,14 +645,11 @@ const activePointers = new Map();
 let gestureStart = null;
 let gestureTargetId = null; // 현재 제스처가 조작 중인 인스턴스
 
-function hitTestCharacter(x, y) {
-  // 역순으로 (위에 그려진 것부터) 히트 테스트
-  const entries = [...activeChars.entries()].reverse();
-  for (const [instId, state] of entries) {
-    const rect = state.el.getBoundingClientRect();
-    if (x >= rect.left && x <= rect.right && y >= rect.top && y <= rect.bottom) {
-      return instId;
-    }
+function hitTestCharacter(e) {
+  // DOM 이벤트 타겟에서 직접 wrapper를 찾음 (가장 확실한 방법)
+  const wrapper = e.target.closest('.char-wrapper');
+  if (wrapper && wrapper.dataset.instanceId) {
+    return wrapper.dataset.instanceId;
   }
   return null;
 }
@@ -658,7 +667,7 @@ function setupGestures() {
     if (e.target.closest('.char-remove')) return;
     e.preventDefault();
 
-    const hitId = hitTestCharacter(e.clientX, e.clientY);
+    const hitId = hitTestCharacter(e);
 
     // 첫 번째 포인터: 탭 감지 준비
     if (activePointers.size === 0) {
@@ -948,6 +957,15 @@ $('#size-down-btn').addEventListener('click', () => {
   state.width = Math.max(SIZE_MIN, state.width / SIZE_STEP);
   updateInstanceTransform(selectedInstanceId);
 });
+
+// 삭제 확인 모달 이벤트
+$('#delete-confirm').addEventListener('click', () => {
+  if (pendingDeleteCharId) {
+    deleteCustomCharacter(pendingDeleteCharId);
+  }
+  hideDeleteConfirm();
+});
+$('#delete-cancel').addEventListener('click', hideDeleteConfirm);
 
 // 이미지 추가 모달 이벤트
 $('#add-image-confirm').addEventListener('click', confirmAddImage);
