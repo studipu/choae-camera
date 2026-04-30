@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+  <meta name="theme-color" content="#1a1a2e" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="최애카메라" />
+  <title>최애 카메라</title>
+  <link rel="manifest" href="manifest.webmanifest" />
+  <link rel="icon" href="favicon.png" type="image/png" />
+  <link rel="apple-touch-icon" href="icon-192.png" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <!-- 시작 화면 -->
+  <div id="start-screen" class="screen">
+    <div class="start-inner">
+      <h1>📷 최애 카메라</h1>
+      <p>좋아하는 캐릭터와 함께<br/>사진을 찍어보세요</p>
+      <button id="start-btn" class="primary-btn">카메라 시작</button>
+      <p class="hint">* 카메라 접근 권한이 필요합니다</p>
+    </div>
+  </div>
+
+  <!-- 카메라 화면 -->
+  <div id="camera-screen" class="screen hidden">
+    <video id="camera" autoplay playsinline muted></video>
+
+    <!-- 캐릭터 오버레이 -->
+    <img id="character" class="character" src="" alt="character" draggable="false" />
+
+    <!-- 상단 바 -->
+    <div class="top-bar">
+      <button id="close-btn" class="icon-btn" title="닫기">✕</button>
+      <button id="flip-camera-btn" class="icon-btn" title="전/후면 전환">🔄</button>
+    </div>
+
+    <!-- 캐릭터 컨트롤 -->
+    <div class="char-controls">
+      <button id="size-up-btn" class="icon-btn" title="크게">+</button>
+      <button id="size-down-btn" class="icon-btn" title="작게">−</button>
+      <button id="flip-char-btn" class="icon-btn" title="좌우 반전">↔</button>
+      <button id="reset-char-btn" class="icon-btn" title="위치/크기 초기화">↺</button>
+    </div>
+
+    <!-- 하단 바 -->
+    <div class="bottom-bar">
+      <input type="file" id="file-input" accept="image/*" hidden />
+      <div id="character-gallery" class="gallery"></div>
+      <div class="shutter-row">
+        <div class="shutter-side"></div>
+        <button id="shutter-btn" class="shutter" aria-label="촬영"></button>
+        <div class="shutter-side"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 미리보기 화면 -->
+  <div id="preview-screen" class="screen hidden">
+    <img id="preview-img" alt="촬영 결과" />
+    <div class="preview-actions">
+      <button id="retake-btn" class="secondary-btn">다시 찍기</button>
+      <button id="download-btn" class="primary-btn">저장</button>
+    </div>
+  </div>
+
+  <!-- 이미지 추가 미리보기 모달 -->
+  <div id="add-image-modal" class="modal hidden">
+    <div class="modal-content">
+      <h3>이미지 추가</h3>
+      <div class="modal-preview">
+        <img id="add-image-preview" alt="미리보기" />
+        <button id="crop-btn" class="modal-overlay-btn" type="button">✂ 자르기</button>
+      </div>
+      <p class="modal-hint">
+        배경이 투명한 PNG (캐릭터만 잘라낸 이미지)를 추가하면 자연스럽게 합성됩니다.<br/>
+        배경 제거는 <a href="https://www.remove.bg/" target="_blank" rel="noopener">remove.bg</a> 같은 외부 도구를 이용해주세요.
+      </p>
+      <div class="modal-actions">
+        <button id="add-image-cancel" class="secondary-btn">취소</button>
+        <button id="add-image-confirm" class="primary-btn">추가</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 자르기 풀스크린 -->
+  <div id="crop-screen" class="screen hidden">
+    <div class="crop-stage" id="crop-stage">
+      <img id="crop-image" alt="" />
+      <div class="crop-frame" id="crop-frame">
+        <div class="crop-handle" data-corner="nw"></div>
+        <div class="crop-handle" data-corner="ne"></div>
+        <div class="crop-handle" data-corner="sw"></div>
+        <div class="crop-handle" data-corner="se"></div>
+      </div>
+    </div>
+    <div class="crop-toolbar">
+      <button id="crop-cancel" class="secondary-btn" type="button">취소</button>
+      <button id="crop-apply" class="primary-btn" type="button">적용</button>
+    </div>
+  </div>
+
+  <!-- 에러 메시지 -->
+  <div id="error-toast" class="toast hidden"></div>
+
+  <script src="app.js"></script>
+  <script>
+    // 서비스 워커 등록 (오프라인/홈 화면 추가 지원)
+    if ('serviceWorker' in navigator && window.isSecureContext) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('service-worker.js').catch((err) => {
+          console.warn('SW 등록 실패:', err);
+        });
+      });
+    }
+  </script>
+</body>
+</html>

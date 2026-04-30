@@ -1,0 +1,599 @@
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  -webkit-tap-highlight-color: transparent;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+html, body {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: #000;
+  color: #fff;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Apple SD Gothic Neo",
+               "Malgun Gothic", "맑은 고딕", sans-serif;
+  overscroll-behavior: none;
+  position: fixed;
+  inset: 0;
+}
+
+.screen {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.hidden {
+  display: none !important;
+}
+
+/* ================= 시작 화면 ================= */
+#start-screen {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(160deg, #1a1a2e, #16213e 60%, #0f3460);
+  padding: 24px;
+}
+
+.start-inner {
+  text-align: center;
+  max-width: 360px;
+}
+
+.start-inner h1 {
+  font-size: 32px;
+  margin-bottom: 16px;
+  letter-spacing: -0.5px;
+}
+
+.start-inner p {
+  font-size: 16px;
+  line-height: 1.5;
+  margin-bottom: 28px;
+  color: #d8d8e0;
+}
+
+.primary-btn {
+  background: #ffffff;
+  color: #1a1a2e;
+  border: none;
+  padding: 14px 36px;
+  border-radius: 999px;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: transform 0.15s, opacity 0.15s;
+}
+
+.primary-btn:active {
+  transform: scale(0.97);
+  opacity: 0.85;
+}
+
+.secondary-btn {
+  background: rgba(255, 255, 255, 0.15);
+  color: #fff;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  padding: 14px 32px;
+  border-radius: 999px;
+  font-size: 16px;
+  font-weight: 500;
+  cursor: pointer;
+  backdrop-filter: blur(10px);
+}
+
+.secondary-btn:active {
+  background: rgba(255, 255, 255, 0.25);
+}
+
+.hint {
+  margin-top: 18px !important;
+  font-size: 12px !important;
+  color: #888 !important;
+}
+
+/* ================= 카메라 화면 ================= */
+#camera-screen {
+  background: #000;
+}
+
+#camera {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  background: #000;
+}
+
+#camera.mirrored {
+  transform: scaleX(-1);
+}
+
+.character {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 200px;            /* 초기 너비 (JS에서 조정됨) */
+  height: auto;
+  pointer-events: auto;
+  touch-action: none;
+  transform-origin: center center;
+  will-change: transform;
+  user-select: none;
+  -webkit-user-drag: none;
+  filter: drop-shadow(0 4px 8px rgba(0,0,0,0.3));
+}
+
+.top-bar {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  padding: max(12px, env(safe-area-inset-top)) 16px 12px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  z-index: 5;
+  background: linear-gradient(to bottom, rgba(0,0,0,0.4), transparent);
+  pointer-events: none;
+}
+
+.top-bar > * {
+  pointer-events: auto;
+}
+
+.char-controls {
+  position: absolute;
+  right: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  z-index: 5;
+}
+
+.char-controls .icon-btn {
+  width: 42px;
+  height: 42px;
+  font-size: 22px;
+}
+
+#size-up-btn, #size-down-btn {
+  font-weight: 300;
+  line-height: 1;
+}
+
+.icon-btn {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  border: none;
+  background: rgba(0, 0, 0, 0.55);
+  color: #fff;
+  font-size: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  transition: transform 0.1s, background 0.15s;
+}
+
+.icon-btn:active {
+  transform: scale(0.92);
+  background: rgba(255, 255, 255, 0.25);
+}
+
+.bottom-bar {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  padding: 16px 12px max(20px, env(safe-area-inset-bottom));
+  background: linear-gradient(to top, rgba(0,0,0,0.6), transparent);
+  z-index: 5;
+}
+
+.gallery {
+  display: flex;
+  gap: 10px;
+  overflow-x: auto;
+  padding: 8px 4px 14px;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+}
+
+.gallery::-webkit-scrollbar {
+  display: none;
+}
+
+.gallery .thumb {
+  position: relative;
+  flex: 0 0 auto;
+  width: 56px;
+  height: 56px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.12);
+  border: 2px solid transparent;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  overflow: visible;
+  transition: border-color 0.15s, transform 0.1s;
+}
+
+.gallery .thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  pointer-events: none;
+  border-radius: 10px;
+}
+
+.gallery .thumb.active {
+  border-color: #fff;
+  background: rgba(255, 255, 255, 0.25);
+}
+
+.gallery .thumb:active {
+  transform: scale(0.92);
+}
+
+/* "+" 추가 버튼 */
+.gallery .thumb-add {
+  background: rgba(255, 255, 255, 0.06);
+  border: 2px dashed rgba(255, 255, 255, 0.45);
+}
+
+.gallery .thumb-add .plus {
+  font-size: 30px;
+  font-weight: 200;
+  color: #fff;
+  line-height: 1;
+  pointer-events: none;
+}
+
+/* 사용자 추가 캐릭터의 삭제 버튼 */
+.gallery .thumb-delete {
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.85);
+  color: #fff;
+  border: 1.5px solid rgba(255, 255, 255, 0.95);
+  font-size: 16px;
+  line-height: 1;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  padding: 0;
+  z-index: 2;
+  transition: transform 0.1s;
+}
+
+.gallery .thumb-delete:active {
+  transform: scale(0.85);
+}
+
+.shutter-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 32px;
+  padding-top: 8px;
+}
+
+.shutter {
+  width: 72px;
+  height: 72px;
+  border-radius: 50%;
+  border: 4px solid #fff;
+  background: #fff;
+  cursor: pointer;
+  position: relative;
+  transition: transform 0.1s;
+}
+
+.shutter::before {
+  content: "";
+  position: absolute;
+  inset: 4px;
+  border-radius: 50%;
+  background: #fff;
+  border: 2px solid #1a1a2e;
+}
+
+.shutter:active {
+  transform: scale(0.92);
+}
+
+.shutter-side {
+  width: 44px;
+}
+
+/* ================= 미리보기 화면 ================= */
+#preview-screen {
+  background: #000;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+}
+
+#preview-img {
+  max-width: 100%;
+  max-height: calc(100% - 100px);
+  object-fit: contain;
+  border-radius: 8px;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+}
+
+.preview-actions {
+  display: flex;
+  gap: 12px;
+  padding: 16px 0 max(16px, env(safe-area-inset-bottom));
+}
+
+/* ================= 이미지 추가 모달 ================= */
+.modal {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.85);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  z-index: 50;
+  -webkit-backdrop-filter: blur(6px);
+  backdrop-filter: blur(6px);
+}
+
+.modal.hidden {
+  display: none !important;
+}
+
+.modal-content {
+  background: #1a1a2e;
+  border-radius: 18px;
+  padding: 22px;
+  max-width: 400px;
+  width: 100%;
+  max-height: 90vh;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+}
+
+.modal-content h3 {
+  font-size: 18px;
+  font-weight: 600;
+  text-align: center;
+  letter-spacing: -0.3px;
+}
+
+.modal-preview {
+  position: relative;
+  /* 체커보드 패턴 (투명영역 시각화) */
+  background-color: #2a2a3e;
+  background-image:
+    linear-gradient(45deg, #3a3a4e 25%, transparent 25%),
+    linear-gradient(-45deg, #3a3a4e 25%, transparent 25%),
+    linear-gradient(45deg, transparent 75%, #3a3a4e 75%),
+    linear-gradient(-45deg, transparent 75%, #3a3a4e 75%);
+  background-size: 16px 16px;
+  background-position: 0 0, 0 8px, 8px -8px, -8px 0;
+  border-radius: 12px;
+  padding: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 220px;
+  max-height: 45vh;
+  overflow: hidden;
+}
+
+.modal-overlay-btn {
+  position: absolute;
+  bottom: 8px;
+  right: 8px;
+  background: rgba(0, 0, 0, 0.75);
+  color: #fff;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  padding: 7px 14px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  transition: transform 0.1s, background 0.15s;
+}
+
+.modal-overlay-btn:active {
+  transform: scale(0.95);
+  background: rgba(255, 255, 255, 0.2);
+}
+
+#add-image-preview {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+  pointer-events: none;
+}
+
+.modal-hint {
+  font-size: 12px;
+  color: #aaa;
+  line-height: 1.6;
+  margin: 0;
+}
+
+.modal-hint a {
+  color: #8ec6ee;
+  text-decoration: underline;
+}
+
+.modal-actions {
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+  margin-top: 4px;
+}
+
+.modal-actions button {
+  padding: 11px 22px;
+  font-size: 14px;
+  flex: 1;
+  max-width: 140px;
+}
+
+/* ================= 자르기 화면 ================= */
+#crop-screen {
+  display: flex;
+  flex-direction: column;
+  background: #000;
+  z-index: 60;
+}
+
+.crop-stage {
+  flex: 1;
+  position: relative;
+  overflow: hidden;
+  background-color: #1a1a2e;
+  background-image:
+    linear-gradient(45deg, #2a2a3e 25%, transparent 25%),
+    linear-gradient(-45deg, #2a2a3e 25%, transparent 25%),
+    linear-gradient(45deg, transparent 75%, #2a2a3e 75%),
+    linear-gradient(-45deg, transparent 75%, #2a2a3e 75%);
+  background-size: 18px 18px;
+  background-position: 0 0, 0 9px, 9px -9px, -9px 0;
+  touch-action: none;
+}
+
+#crop-image {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  pointer-events: none;
+  user-select: none;
+  -webkit-user-drag: none;
+}
+
+.crop-frame {
+  position: absolute;
+  border: 2px solid #fff;
+  box-shadow:
+    0 0 0 9999px rgba(0, 0, 0, 0.55),
+    inset 0 0 0 1px rgba(0, 0, 0, 0.4);
+  cursor: move;
+  touch-action: none;
+  box-sizing: border-box;
+}
+
+/* 3분할 가이드 라인 */
+.crop-frame::before,
+.crop-frame::after {
+  content: '';
+  position: absolute;
+  background: rgba(255, 255, 255, 0.35);
+  pointer-events: none;
+}
+
+.crop-frame::before {
+  /* 세로 두 줄 */
+  left: 33.33%;
+  right: 33.33%;
+  top: 0;
+  bottom: 0;
+  border-left: 1px solid rgba(255, 255, 255, 0.35);
+  border-right: 1px solid rgba(255, 255, 255, 0.35);
+  background: transparent;
+}
+
+.crop-frame::after {
+  /* 가로 두 줄 */
+  top: 33.33%;
+  bottom: 33.33%;
+  left: 0;
+  right: 0;
+  border-top: 1px solid rgba(255, 255, 255, 0.35);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.35);
+  background: transparent;
+}
+
+.crop-handle {
+  position: absolute;
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  touch-action: none;
+  z-index: 2;
+}
+
+.crop-handle::before {
+  content: '';
+  width: 14px;
+  height: 14px;
+  background: #fff;
+  border: 2px solid #1a1a2e;
+  border-radius: 50%;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.5);
+}
+
+.crop-handle[data-corner="nw"] { top: -18px; left: -18px; }
+.crop-handle[data-corner="ne"] { top: -18px; right: -18px; }
+.crop-handle[data-corner="sw"] { bottom: -18px; left: -18px; }
+.crop-handle[data-corner="se"] { bottom: -18px; right: -18px; }
+
+.crop-toolbar {
+  display: flex;
+  gap: 12px;
+  padding: 14px 18px max(18px, env(safe-area-inset-bottom));
+  background: rgba(0, 0, 0, 0.85);
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.crop-toolbar button {
+  flex: 1;
+  padding: 13px;
+  font-size: 15px;
+}
+
+/* ================= 토스트 ================= */
+.toast {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background: rgba(0, 0, 0, 0.85);
+  color: #fff;
+  padding: 14px 22px;
+  border-radius: 12px;
+  font-size: 14px;
+  z-index: 100;
+  max-width: 80%;
+  text-align: center;
+  line-height: 1.5;
+}
