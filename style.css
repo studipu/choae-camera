@@ -136,6 +136,7 @@ html, body {
   display: block;
   user-select: none;
   -webkit-user-drag: none;
+  -webkit-touch-callout: none;
   filter: drop-shadow(0 4px 8px rgba(0,0,0,0.3));
 }
 

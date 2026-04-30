@@ -519,6 +519,16 @@ function addCharacterToScreen(charId) {
   });
   wrapper.appendChild(removeBtn);
 
+  // 탭 → X 버튼 토글 (click 이벤트는 브라우저가 탭/드래그를 자동 구분)
+  wrapper.addEventListener('click', () => {
+    for (const [id, s] of activeChars) {
+      if (id !== instId) s.el.classList.remove('show-remove');
+    }
+    const cur = activeChars.get(instId);
+    if (cur) cur.el.classList.toggle('show-remove');
+    setSelectedInstance(instId);
+  });
+
   charContainer.appendChild(wrapper);
 
   const state = {
@@ -655,40 +665,32 @@ function hitTestCharacter(e) {
 }
 
 function setupGestures() {
-  // 탭 감지용
-  let pointerDownTime = 0;
-  let pointerDownPos = null;
-  const TAP_THRESHOLD_MS = 300;
-  const TAP_THRESHOLD_PX = 10;
-
   cameraScreen.addEventListener('pointerdown', (e) => {
     if (e.target.closest('button, .gallery, .top-bar, .bottom-bar, .char-controls')) return;
-    // X 버튼 클릭은 자체 이벤트로 처리됨
     if (e.target.closest('.char-remove')) return;
-    e.preventDefault();
 
     const hitId = hitTestCharacter(e);
 
-    // 첫 번째 포인터: 탭 감지 준비
-    if (activePointers.size === 0) {
-      pointerDownTime = Date.now();
-      pointerDownPos = { x: e.clientX, y: e.clientY };
-    }
-
     if (hitId) {
-      // 캐릭터 위를 터치함
+      // 캐릭터 터치: preventDefault 안 함 → click 이벤트로 탭 감지
       gestureTargetId = hitId;
       setSelectedInstance(hitId);
       cameraScreen.setPointerCapture(e.pointerId);
       activePointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
       rebuildGestureStart();
     } else {
-      // 빈 영역 터치 → 모든 X 숨기기, 선택 해제
+      // 빈 영역 터치
+      e.preventDefault();
       hideAllRemoveButtons();
       gestureTargetId = null;
       activePointers.clear();
       gestureStart = null;
     }
+  });
+
+  // 빈 영역 클릭 → X 버튼 모두 숨기기
+  video.addEventListener('click', () => {
+    hideAllRemoveButtons();
   });
 
   cameraScreen.addEventListener('pointermove', (e) => {
@@ -724,26 +726,6 @@ function setupGestures() {
 
   const endPointer = (e) => {
     if (!activePointers.has(e.pointerId)) return;
-
-    // 탭 감지: 짧은 터치 + 이동 거리 적음
-    if (activePointers.size === 1 && gestureTargetId) {
-      const elapsed = Date.now() - pointerDownTime;
-      const dist = pointerDownPos
-        ? Math.hypot(e.clientX - pointerDownPos.x, e.clientY - pointerDownPos.y)
-        : Infinity;
-      if (elapsed < TAP_THRESHOLD_MS && dist < TAP_THRESHOLD_PX) {
-        // 탭: X 버튼 토글
-        const state = activeChars.get(gestureTargetId);
-        if (state) {
-          // 다른 캐릭터의 X 숨기기
-          for (const [id, s] of activeChars) {
-            if (id !== gestureTargetId) s.el.classList.remove('show-remove');
-          }
-          state.el.classList.toggle('show-remove');
-        }
-      }
-    }
-
     activePointers.delete(e.pointerId);
     if (activePointers.size === 0) {
       gestureTargetId = null;
@@ -960,10 +942,14 @@ $('#size-down-btn').addEventListener('click', () => {
 
 // 삭제 확인 모달 이벤트
 $('#delete-confirm').addEventListener('click', () => {
-  if (pendingDeleteCharId) {
-    deleteCustomCharacter(pendingDeleteCharId);
+  const charIdToDelete = pendingDeleteCharId;
+  hideDeleteConfirm(); // 모달 먼저 닫기 (backdrop-filter 제거)
+  if (charIdToDelete) {
+    // DOM 조작을 다음 프레임으로 지연 → 카메라 멈춤 방지
+    requestAnimationFrame(() => {
+      deleteCustomCharacter(charIdToDelete);
+    });
   }
-  hideDeleteConfirm();
 });
 $('#delete-cancel').addEventListener('click', hideDeleteConfirm);
 
