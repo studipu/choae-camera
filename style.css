@@ -206,7 +206,7 @@ html, body {
   display: flex;
   gap: 10px;
   overflow-x: auto;
-  padding: 8px 4px 14px;
+  padding: 14px 4px 14px;
   scrollbar-width: none;
   -webkit-overflow-scrolling: touch;
 }
@@ -265,10 +265,10 @@ html, body {
 /* 사용자 추가 캐릭터의 삭제 버튼 */
 .gallery .thumb-delete {
   position: absolute;
-  top: -6px;
-  right: -6px;
-  width: 22px;
-  height: 22px;
+  top: 2px;
+  right: 2px;
+  width: 20px;
+  height: 20px;
   border-radius: 50%;
   background: rgba(0, 0, 0, 0.85);
   color: #fff;
