@@ -657,14 +657,31 @@ async function capture() {
   });
 }
 
-// ===== 다운로드 =====
-function downloadImage() {
+// ===== 저장 =====
+async function downloadImage() {
   if (!lastCapturedBlob) return;
+  const ts = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+  const fileName = `choae_camera_${ts}.jpg`;
+
+  // 모바일: Web Share API로 네이티브 공유 시트 → "사진에 저장" 가능
+  if (navigator.canShare) {
+    try {
+      const file = new File([lastCapturedBlob], fileName, { type: 'image/jpeg' });
+      if (navigator.canShare({ files: [file] })) {
+        await navigator.share({ files: [file] });
+        return;
+      }
+    } catch (e) {
+      // 사용자가 공유 취소한 경우 무시
+      if (e.name === 'AbortError') return;
+    }
+  }
+
+  // 폴백: 기존 다운로드 방식
   const url = URL.createObjectURL(lastCapturedBlob);
   const a = document.createElement('a');
-  const ts = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
   a.href = url;
-  a.download = `choae_camera_${ts}.jpg`;
+  a.download = fileName;
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);
