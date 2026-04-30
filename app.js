@@ -1,9 +1,10 @@
 /* ============================================================
  * 최애 카메라 (AR-style Photo Frame Camera)
  * ----------------------------------------------------------
- * - 카메라 위에 캐릭터 PNG를 오버레이
- * - 드래그(이동), 핀치(크기), 반전, 후면/전면 전환
- * - 셔터 누르면 영상 + 캐릭터 합성된 단일 이미지 저장
+ * - 카메라 위에 여러 캐릭터 PNG를 동시에 오버레이
+ * - 각 캐릭터를 개별적으로 드래그(이동), 핀치(크기), 반전
+ * - 캐릭터 탭 → X 버튼 표시 → 제거 가능
+ * - 셔터 누르면 영상 + 모든 캐릭터 합성된 단일 이미지 저장
  * - 사용자가 자기 기기에서 이미지를 추가하여 캐릭터 슬롯에
  *   저장 (브라우저 localStorage, 서버 업로드 없음)
  * ============================================================ */
@@ -21,7 +22,7 @@ const startScreen = $('#start-screen');
 const cameraScreen = $('#camera-screen');
 const previewScreen = $('#preview-screen');
 const video = $('#camera');
-const character = $('#character');
+const charContainer = $('#character-container');
 const gallery = $('#character-gallery');
 const previewImg = $('#preview-img');
 const errorToast = $('#error-toast');
@@ -36,15 +37,11 @@ const cropFrame = $('#crop-frame');
 // ===== 상태 =====
 let stream = null;
 let isFrontCamera = false;
-let currentCharId = null;
 
-// 캐릭터 위치/크기 상태 (스크린 픽셀 기준)
-let charState = {
-  x: window.innerWidth / 2,
-  y: window.innerHeight / 2,
-  width: 220,
-  flipped: false,
-};
+// 멀티 캐릭터: key = instanceId, value = { charId, x, y, width, flipped, el, imgEl }
+const activeChars = new Map();
+let instanceCounter = 0;
+let selectedInstanceId = null; // 현재 선택된(조작 대상) 캐릭터 인스턴스
 
 let lastCapturedBlob = null;
 
@@ -173,7 +170,7 @@ function confirmAddImage() {
   customs.unshift(newChar);
   if (saveCustomCharacters(customs)) {
     buildGallery();
-    selectCharacter(newChar.id);
+    addCharacterToScreen(newChar.id);
     showToast('추가되었습니다', 1200);
   }
   hideAddImageModal();
@@ -394,22 +391,33 @@ function setupCropGestures() {
   document.addEventListener('pointercancel', onEnd);
 }
 
+// ===== 캐릭터 삭제 (localStorage에서) =====
 function deleteCustomCharacter(id) {
   const customs = loadCustomCharacters();
   const filtered = customs.filter(c => c.id !== id);
   saveCustomCharacters(filtered);
-  // 만약 지운 게 현재 선택된 캐릭터라면 다른 걸 선택
-  if (currentCharId === id) {
-    const all = getAllCharacters();
-    if (all.length > 0) selectCharacter(all[0].id);
-  } else {
-    buildGallery();
+  // 화면에 있는 해당 캐릭터의 모든 인스턴스 제거
+  for (const [instId, state] of activeChars) {
+    if (state.charId === id) {
+      removeCharacterFromScreen(instId);
+    }
   }
+  buildGallery();
+}
+
+// ===== 화면에 있는 charId 목록 =====
+function getActiveCharIds() {
+  const ids = new Set();
+  for (const state of activeChars.values()) {
+    ids.add(state.charId);
+  }
+  return ids;
 }
 
 // ===== 캐릭터 갤러리 빌드 =====
 function buildGallery() {
   const all = getAllCharacters();
+  const onScreen = getActiveCharIds();
   gallery.innerHTML = '';
 
   // "+" 추가 버튼 (항상 첫 번째)
@@ -423,7 +431,7 @@ function buildGallery() {
   // 각 캐릭터 썸네일
   all.forEach((c) => {
     const thumb = document.createElement('div');
-    thumb.className = 'thumb' + (c.id === currentCharId ? ' active' : '');
+    thumb.className = 'thumb' + (onScreen.has(c.id) ? ' active' : '');
     thumb.dataset.id = c.id;
 
     const im = document.createElement('img');
@@ -446,39 +454,143 @@ function buildGallery() {
       thumb.appendChild(del);
     }
 
-    thumb.addEventListener('click', () => selectCharacter(c.id));
+    thumb.addEventListener('click', () => toggleCharacter(c.id));
     gallery.appendChild(thumb);
   });
 }
 
-function selectCharacter(id) {
-  const c = findCharacter(id);
+// ===== 갤러리 토글: 클릭 시 화면에 추가/제거 =====
+function toggleCharacter(charId) {
+  // 이미 화면에 있으면 제거
+  for (const [instId, state] of activeChars) {
+    if (state.charId === charId) {
+      removeCharacterFromScreen(instId);
+      return;
+    }
+  }
+  // 없으면 추가
+  addCharacterToScreen(charId);
+}
+
+// ===== 캐릭터 인스턴스 생성 (화면에 추가) =====
+function addCharacterToScreen(charId) {
+  const c = findCharacter(charId);
   if (!c) return;
-  currentCharId = id;
-  character.src = c.src;
-  // 갤러리 active 갱신
+
+  const instId = 'inst_' + (++instanceCounter);
+
+  // 배치 좌표: 화면 중앙, 기존 캐릭터와 겹치면 약간 오프셋
+  let baseX = window.innerWidth / 2;
+  let baseY = window.innerHeight / 2;
+  const offset = activeChars.size * 30;
+  baseX += offset % 90 - 30;
+  baseY += offset % 90 - 30;
+
+  // wrapper div 생성
+  const wrapper = document.createElement('div');
+  wrapper.className = 'char-wrapper';
+  wrapper.dataset.instanceId = instId;
+
+  const imgEl = document.createElement('img');
+  imgEl.src = c.src;
+  imgEl.alt = c.name;
+  imgEl.draggable = false;
+  wrapper.appendChild(imgEl);
+
+  const removeBtn = document.createElement('button');
+  removeBtn.type = 'button';
+  removeBtn.className = 'char-remove';
+  removeBtn.textContent = '✕';
+  removeBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    removeCharacterFromScreen(instId);
+  });
+  wrapper.appendChild(removeBtn);
+
+  charContainer.appendChild(wrapper);
+
+  const state = {
+    charId,
+    x: baseX,
+    y: baseY,
+    width: 220,
+    flipped: false,
+    el: wrapper,
+    imgEl,
+  };
+  activeChars.set(instId, state);
+
+  // 이미지 로드 후 transform 적용
+  if (imgEl.complete && imgEl.naturalWidth) {
+    updateInstanceTransform(instId);
+  } else {
+    imgEl.addEventListener('load', () => updateInstanceTransform(instId), { once: true });
+  }
+
+  // 선택 상태 설정
+  setSelectedInstance(instId);
+  updateGalleryActiveState();
+}
+
+// ===== 캐릭터 인스턴스 제거 =====
+function removeCharacterFromScreen(instId) {
+  const state = activeChars.get(instId);
+  if (!state) return;
+  state.el.remove();
+  activeChars.delete(instId);
+
+  if (selectedInstanceId === instId) {
+    // 다른 인스턴스가 있으면 마지막 것을 선택
+    const keys = [...activeChars.keys()];
+    setSelectedInstance(keys.length > 0 ? keys[keys.length - 1] : null);
+  }
+  updateGalleryActiveState();
+}
+
+// ===== 선택 상태 관리 =====
+function setSelectedInstance(instId) {
+  // 이전 선택 해제
+  if (selectedInstanceId && activeChars.has(selectedInstanceId)) {
+    activeChars.get(selectedInstanceId).el.classList.remove('selected');
+  }
+  selectedInstanceId = instId;
+  if (instId && activeChars.has(instId)) {
+    activeChars.get(instId).el.classList.add('selected');
+  }
+}
+
+// ===== 갤러리 active 상태 갱신 =====
+function updateGalleryActiveState() {
+  const onScreen = getActiveCharIds();
   [...gallery.children].forEach((el) => {
     if (el.classList.contains('thumb-add')) return;
-    el.classList.toggle('active', el.dataset.id === id);
+    el.classList.toggle('active', onScreen.has(el.dataset.id));
   });
 }
 
-// ===== 캐릭터 위치/크기 적용 =====
-function updateCharacterTransform() {
-  const aspect = (character.naturalHeight && character.naturalWidth)
-    ? character.naturalHeight / character.naturalWidth
-    : 1.83;
-  const w = charState.width;
-  const h = w * aspect;
-  character.style.width = w + 'px';
-  character.style.height = h + 'px';
-  character.style.left = (charState.x - w / 2) + 'px';
-  character.style.top = (charState.y - h / 2) + 'px';
-  character.style.transform = charState.flipped ? 'scaleX(-1)' : 'none';
+// ===== 모든 X 버튼 숨기기 =====
+function hideAllRemoveButtons() {
+  for (const state of activeChars.values()) {
+    state.el.classList.remove('show-remove');
+  }
 }
 
-// 이미지 로드 후 비율 반영
-character.addEventListener('load', updateCharacterTransform);
+// ===== 캐릭터 인스턴스 위치/크기 적용 =====
+function updateInstanceTransform(instId) {
+  const state = activeChars.get(instId);
+  if (!state) return;
+  const { imgEl, el } = state;
+  const aspect = (imgEl.naturalHeight && imgEl.naturalWidth)
+    ? imgEl.naturalHeight / imgEl.naturalWidth
+    : 1.83;
+  const w = state.width;
+  const h = w * aspect;
+  el.style.width = w + 'px';
+  el.style.height = h + 'px';
+  el.style.left = (state.x - w / 2) + 'px';
+  el.style.top = (state.y - h / 2) + 'px';
+  imgEl.style.transform = state.flipped ? 'scaleX(-1)' : 'none';
+}
 
 // ===== 카메라 시작 =====
 async function startCamera() {
@@ -516,63 +628,136 @@ async function startCamera() {
   }
 }
 
-// ===== 제스처: 드래그 + 핀치 =====
+// ===== 제스처: 드래그 + 핀치 (멀티 캐릭터 대응) =====
 const activePointers = new Map();
 let gestureStart = null;
+let gestureTargetId = null; // 현재 제스처가 조작 중인 인스턴스
+
+function hitTestCharacter(x, y) {
+  // 역순으로 (위에 그려진 것부터) 히트 테스트
+  const entries = [...activeChars.entries()].reverse();
+  for (const [instId, state] of entries) {
+    const rect = state.el.getBoundingClientRect();
+    if (x >= rect.left && x <= rect.right && y >= rect.top && y <= rect.bottom) {
+      return instId;
+    }
+  }
+  return null;
+}
 
 function setupGestures() {
+  // 탭 감지용
+  let pointerDownTime = 0;
+  let pointerDownPos = null;
+  const TAP_THRESHOLD_MS = 300;
+  const TAP_THRESHOLD_PX = 10;
+
   cameraScreen.addEventListener('pointerdown', (e) => {
     if (e.target.closest('button, .gallery, .top-bar, .bottom-bar, .char-controls')) return;
+    // X 버튼 클릭은 자체 이벤트로 처리됨
+    if (e.target.closest('.char-remove')) return;
     e.preventDefault();
-    cameraScreen.setPointerCapture(e.pointerId);
-    activePointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
-    rebuildGestureStart();
+
+    const hitId = hitTestCharacter(e.clientX, e.clientY);
+
+    // 첫 번째 포인터: 탭 감지 준비
+    if (activePointers.size === 0) {
+      pointerDownTime = Date.now();
+      pointerDownPos = { x: e.clientX, y: e.clientY };
+    }
+
+    if (hitId) {
+      // 캐릭터 위를 터치함
+      gestureTargetId = hitId;
+      setSelectedInstance(hitId);
+      cameraScreen.setPointerCapture(e.pointerId);
+      activePointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+      rebuildGestureStart();
+    } else {
+      // 빈 영역 터치 → 모든 X 숨기기, 선택 해제
+      hideAllRemoveButtons();
+      gestureTargetId = null;
+      activePointers.clear();
+      gestureStart = null;
+    }
   });
 
   cameraScreen.addEventListener('pointermove', (e) => {
     if (!activePointers.has(e.pointerId)) return;
     activePointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
-    if (!gestureStart) return;
+    if (!gestureStart || !gestureTargetId) return;
+
+    const state = activeChars.get(gestureTargetId);
+    if (!state) return;
 
     const pts = [...activePointers.values()];
 
     if (gestureStart.type === 'drag' && pts.length === 1) {
       const dx = pts[0].x - gestureStart.pointer.x;
       const dy = pts[0].y - gestureStart.pointer.y;
-      charState.x = gestureStart.char.x + dx;
-      charState.y = gestureStart.char.y + dy;
-      charState.x = Math.max(20, Math.min(window.innerWidth - 20, charState.x));
-      charState.y = Math.max(20, Math.min(window.innerHeight - 20, charState.y));
-      updateCharacterTransform();
+      state.x = gestureStart.char.x + dx;
+      state.y = gestureStart.char.y + dy;
+      state.x = Math.max(20, Math.min(window.innerWidth - 20, state.x));
+      state.y = Math.max(20, Math.min(window.innerHeight - 20, state.y));
+      updateInstanceTransform(gestureTargetId);
     } else if (gestureStart.type === 'pinch' && pts.length === 2) {
       const dist = Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y);
       const ratio = dist / gestureStart.dist;
       const newW = gestureStart.char.width * ratio;
-      charState.width = Math.max(60, Math.min(window.innerWidth * 1.6, newW));
+      state.width = Math.max(60, Math.min(window.innerWidth * 1.6, newW));
       const cx = (pts[0].x + pts[1].x) / 2;
       const cy = (pts[0].y + pts[1].y) / 2;
-      charState.x = gestureStart.char.x + (cx - gestureStart.center.x);
-      charState.y = gestureStart.char.y + (cy - gestureStart.center.y);
-      updateCharacterTransform();
+      state.x = gestureStart.char.x + (cx - gestureStart.center.x);
+      state.y = gestureStart.char.y + (cy - gestureStart.center.y);
+      updateInstanceTransform(gestureTargetId);
     }
   });
 
   const endPointer = (e) => {
     if (!activePointers.has(e.pointerId)) return;
+
+    // 탭 감지: 짧은 터치 + 이동 거리 적음
+    if (activePointers.size === 1 && gestureTargetId) {
+      const elapsed = Date.now() - pointerDownTime;
+      const dist = pointerDownPos
+        ? Math.hypot(e.clientX - pointerDownPos.x, e.clientY - pointerDownPos.y)
+        : Infinity;
+      if (elapsed < TAP_THRESHOLD_MS && dist < TAP_THRESHOLD_PX) {
+        // 탭: X 버튼 토글
+        const state = activeChars.get(gestureTargetId);
+        if (state) {
+          // 다른 캐릭터의 X 숨기기
+          for (const [id, s] of activeChars) {
+            if (id !== gestureTargetId) s.el.classList.remove('show-remove');
+          }
+          state.el.classList.toggle('show-remove');
+        }
+      }
+    }
+
     activePointers.delete(e.pointerId);
-    rebuildGestureStart();
+    if (activePointers.size === 0) {
+      gestureTargetId = null;
+      gestureStart = null;
+    } else {
+      rebuildGestureStart();
+    }
   };
   cameraScreen.addEventListener('pointerup', endPointer);
   cameraScreen.addEventListener('pointercancel', endPointer);
 }
 
 function rebuildGestureStart() {
+  if (!gestureTargetId) { gestureStart = null; return; }
+  const state = activeChars.get(gestureTargetId);
+  if (!state) { gestureStart = null; return; }
+
   const pts = [...activePointers.values()];
   if (pts.length === 1) {
     gestureStart = {
       type: 'drag',
       pointer: { ...pts[0] },
-      char: { ...charState },
+      char: { x: state.x, y: state.y, width: state.width },
     };
   } else if (pts.length === 2) {
     const dist = Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y);
@@ -582,19 +767,23 @@ function rebuildGestureStart() {
       type: 'pinch',
       dist,
       center: { x: cx, y: cy },
-      char: { ...charState },
+      char: { x: state.x, y: state.y, width: state.width },
     };
   } else {
     gestureStart = null;
   }
 }
 
-// ===== 캡처 (영상 + 캐릭터를 단일 이미지로) =====
+// ===== 캡처 (영상 + 모든 캐릭터를 단일 이미지로) =====
 async function capture() {
   if (!video.videoWidth) {
     showToast('카메라가 아직 준비되지 않았습니다');
     return;
   }
+
+  // 캡처 전 UI 정리
+  hideAllRemoveButtons();
+  setSelectedInstance(null);
 
   const screenW = window.innerWidth;
   const screenH = window.innerHeight;
@@ -632,17 +821,21 @@ async function capture() {
     ctx.drawImage(video, sx, sy, sw, sh, 0, 0, canvas.width, canvas.height);
   }
 
-  if (character.complete && character.naturalWidth) {
-    const aspect = character.naturalHeight / character.naturalWidth;
-    const cw = charState.width * dpr;
+  // 모든 캐릭터를 추가된 순서대로 그리기
+  for (const [, state] of activeChars) {
+    const { imgEl } = state;
+    if (!imgEl.complete || !imgEl.naturalWidth) continue;
+
+    const aspect = imgEl.naturalHeight / imgEl.naturalWidth;
+    const cw = state.width * dpr;
     const ch = cw * aspect;
-    const cx = charState.x * dpr;
-    const cy = charState.y * dpr;
+    const cx = state.x * dpr;
+    const cy = state.y * dpr;
 
     ctx.save();
     ctx.translate(cx, cy);
-    if (charState.flipped) ctx.scale(-1, 1);
-    ctx.drawImage(character, -cw / 2, -ch / 2, cw, ch);
+    if (state.flipped) ctx.scale(-1, 1);
+    ctx.drawImage(imgEl, -cw / 2, -ch / 2, cw, ch);
     ctx.restore();
   }
 
@@ -690,14 +883,17 @@ async function downloadImage() {
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
+// ===== 선택된 인스턴스의 state 가져오기 =====
+function getSelectedState() {
+  if (!selectedInstanceId) return null;
+  return activeChars.get(selectedInstanceId) || null;
+}
+
 // ===== 이벤트 바인딩 =====
 $('#start-btn').addEventListener('click', async () => {
   try {
     await startCamera();
     showScreen('camera');
-    const all = getAllCharacters();
-    if (all.length > 0 && !currentCharId) selectCharacter(all[0].id);
-    updateCharacterTransform();
   } catch (e) {
     /* startCamera 내부에서 토스트 표시됨 */
   }
@@ -715,16 +911,20 @@ $('#flip-camera-btn').addEventListener('click', async () => {
 });
 
 $('#flip-char-btn').addEventListener('click', () => {
-  charState.flipped = !charState.flipped;
-  updateCharacterTransform();
+  const state = getSelectedState();
+  if (!state) return;
+  state.flipped = !state.flipped;
+  updateInstanceTransform(selectedInstanceId);
 });
 
 $('#reset-char-btn').addEventListener('click', () => {
-  charState.x = window.innerWidth / 2;
-  charState.y = window.innerHeight / 2;
-  charState.width = 220;
-  charState.flipped = false;
-  updateCharacterTransform();
+  const state = getSelectedState();
+  if (!state) return;
+  state.x = window.innerWidth / 2;
+  state.y = window.innerHeight / 2;
+  state.width = 220;
+  state.flipped = false;
+  updateInstanceTransform(selectedInstanceId);
 });
 
 // 크기 조절 버튼 (한 번 누를 때마다 약 15% 변화)
@@ -736,13 +936,17 @@ function getSizeMax() {
 }
 
 $('#size-up-btn').addEventListener('click', () => {
-  charState.width = Math.min(getSizeMax(), charState.width * SIZE_STEP);
-  updateCharacterTransform();
+  const state = getSelectedState();
+  if (!state) return;
+  state.width = Math.min(getSizeMax(), state.width * SIZE_STEP);
+  updateInstanceTransform(selectedInstanceId);
 });
 
 $('#size-down-btn').addEventListener('click', () => {
-  charState.width = Math.max(SIZE_MIN, charState.width / SIZE_STEP);
-  updateCharacterTransform();
+  const state = getSelectedState();
+  if (!state) return;
+  state.width = Math.max(SIZE_MIN, state.width / SIZE_STEP);
+  updateInstanceTransform(selectedInstanceId);
 });
 
 // 이미지 추가 모달 이벤트
@@ -780,9 +984,11 @@ fileInput.addEventListener('change', async (e) => {
 
 // 화면 회전/리사이즈 시 캐릭터가 화면 밖으로 안 나가게
 window.addEventListener('resize', () => {
-  charState.x = Math.max(20, Math.min(window.innerWidth - 20, charState.x));
-  charState.y = Math.max(20, Math.min(window.innerHeight - 20, charState.y));
-  updateCharacterTransform();
+  for (const [instId, state] of activeChars) {
+    state.x = Math.max(20, Math.min(window.innerWidth - 20, state.x));
+    state.y = Math.max(20, Math.min(window.innerHeight - 20, state.y));
+    updateInstanceTransform(instId);
+  }
 });
 
 // 더블탭 줌 방지 (iOS)
